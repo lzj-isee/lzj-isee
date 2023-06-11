@@ -62,7 +62,7 @@ $$
 显然，等式右边就是常见的分类任务的损失函数，其中加号左边可以是`BCE`、`CE`这种，加号右边可以是`L1`、`L2`正则化。如果按照优化的思路，找到一个神经网络的参数$x$使得 $-\log{p(x|\mathcal{D}_{train})}$ 最小，我们就找到了当前训练集上的一个最优模型，神经网络的推理过程就是再次计算似然函数：
 
 $$
-p(d_{test}|\mathcal{D}_{train}) = p(d_{test}|x^*), \quad \text{where} \quad x^* = \arg\min_{x} -\log{p(x|\mathcal{D}_{train})}.
+p(d_{test}|\mathcal{D}_{train}) = p(d_{test}|x^*), \quad \text{where} \quad x^* = \arg\min_{x} -\log{p(x|\mathcal{D}_{train})}. \tag{4}
 $$
 
 **然而对于贝叶斯学习，或者说贝叶斯推理，推理过程被建模为**：
@@ -73,7 +73,16 @@ $$
     p(d_{test}|\mathcal{D}_{train}) 
     & = \int \underbrace{p(d_{test}| x)}_{prediction} \frac{\overbrace{p(\mathcal{D}_{train}|x)}^{likelihood}\overbrace{p(x)}^{prior}}{\underbrace{p(\mathcal{D}_{train})}_{marginal}}\mathrm{d}x \\
     & = \int \underbrace{p(d_{test}|x)}_{prediction}\underbrace{p(x|\mathcal{D}_{train})}_{posterior}\mathrm{d}x \\ 
-    & = \mathbb{E}_{x \sim p(x|\mathcal{D}_{train})}\left[p(d_{test}|x)\right],
-    \end{split}
+    & = \mathbb{E}_{x \sim p(x|\mathcal{D}_{train})}\left[p(d_{test}|x)\right].
+    \end{split} \tag{5}
 \end{align*}
 $$
+
+对比式$(4)$和$(5)$，可以发现前者取当前训练集的最优的**一个**模型推理输出概率，而后者计算输出概率关于模型后验分布$\mathbb{E}_{x \sim p(x|\mathcal{D}_{train})}$的期望（当然也可以计算方差，建模输出结果的不确定度）。
+
+这就是很多论文提到的：
+
+1. 贝叶斯学习（推理）体现了模型输出的不确定度：单个预测结果$\to$预测结果的分布
+2. 贝叶斯学习在少样本情况下不容易过拟合（此时贝叶斯学习的行为类似于集成学习，但一个显著的区别是，若损失函数的surface是凸的，那么集成学习的所有优化点都会坍缩到全局最优，但是贝叶斯学习的分布不会坍缩为狄拉克分布）。
+
+<center><img src="https://github.com/lzj-isee/lzj-isee/source/_posts/da/fig/uncertainty.png" width="80%" /></center>
