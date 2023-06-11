@@ -1,6 +1,9 @@
+title: 采样与生成（1）：分布近似问题
+---
+
 ## 分布近似问题
 
-就本人目前所了解的现状，分布近似问题尚未在学界被严肃定义，多数研究者可能熟悉的是多年来持续火热的生成模型：生成对抗网络（Generative Adversarial Networks, GAN），扩散模型（Diffusion Model）等等。另一些核心却冷门的领域，如马尔科夫链蒙特卡洛采样（Markov Chain Monte Carlo, MCMC），或是变分推理（Variational Inference, VI），则极少成为人们热议的对象。实际上，MCMC与VI常常出现在生成模型的论文中，从远古时期的变分自编码器VAE，到Energy-based、基于Score Matching的生成模型，再到近两年火热的扩散模型（Diffusion Model），甚至生成对抗网络（GAN）都可以被解释为使用特殊kernel的VI。另一方面，起始于2016年的粒子变分推理法（Particle-based Variational Inference, ParVI）被逐步构建与MCMC、VI方法的联系，生成与采样逐渐被统一理解为分布近似问题。
+就本人目前所了解的现状，分布近似问题尚未在学界被严肃定义，多数研究者可能熟悉的是多年来持续火热的生成模型：生成对抗网络（Generative Adversarial Networks, GAN），扩散模型（Diffusion Model）等等。另一些核心却冷门的领域，如马尔科夫链蒙特卡洛采样（Markov Chain Monte Carlo, MCMC），或是变分推理（Variational Inference, VI），则极少成为人们热议的对象。实际上，MCMC与VI常常出现在生成模型的论文中，从远古时期的变分自编码器VAE，到Energy-based、基于Score Matching的生成模型，再到近两年火热的扩散模型（Diffusion Model），甚至生成对抗网络（GAN）都可以被解释为使用特殊kernel的VI。另一方面，起始于2016年的粒子变分推理法（Particle-based Variational Inference, ParVI）被逐步构建与MCMC、VI方法的联系，生成与采样逐渐被统一理解为求解分布近似问题。
 
 ### 问题定义
 
