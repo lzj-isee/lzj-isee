@@ -1,5 +1,9 @@
 title: 采样与生成（1）：分布近似问题
 description: 分布近似问题简介。
+tags:
+- 机器学习
+- 贝叶斯学习
+- 分布近似
 ---
 
 ## 分布近似问题
@@ -153,3 +157,119 @@ $$
 <center><img src="problem/parvi.png" width="95%" /></center>
 
 上图是一个ParVI迭代过程（从左至右）的典型示例（二维分布近似），我将粒子点标上了颜色，可以更清楚观察到粒子点的移动轨迹。背景的等高线表示目标分布的概率密度。
+
+### 生成模型
+
+采样问题的设定中，目标分布$\nu$是连续分布，对空间中的点$x$可计算该处的概率密度函数$\nu(x)$。而分布近似问题的另一种设定，目标分布为离散经验分布（用$\tilde{\nu}$表示），此时目标分布的概率密度函数不可知，$\tilde{\nu}$表示为$N$个粒子点$\{y_j\}^N_{j=1}$（有权重的情况下表示为$\{(\beta_j,y_j)\}^N_{j=1}$），此时分布近似问题可看作以度量$\mathcal{F}$为损失函数的拟合问题。
+
+> 分布近似问题与生成模型的联系是什么？
+
+以CV的生成模型为例，这些模型的目标是将随机的高斯噪声样本$z$转化为图像$\tilde{x}$，并且希望生成的图像$\tilde{x}$接近真实图像$x$。我们假设模型参数可以用符号$\theta$表示，由网络参数化的“生成”分布可表示为$p_\theta(x)$。总而言之，这些符号的意义如下：
+
+- $\tilde{\nu}$表示目标分布，也就是训练的数据集，包含了多张真实图像。
+- 随机高维噪声用$z$表示。
+- 神经网络的参数用$\theta$表示，随机噪声$z$可以通过神经网络转化为图像$\tilde{x}=f_\theta(z)$。
+- 由神经网络参数化的“生成分布”表示为$p_\theta(x)$。
+
+> 这里有一点符号混淆的问题是我们同时用$x$表示实向量空间中的点以及真实图像，而用$\tilde{x}$仅表示生成图像，但是应该比较好理解。
+
+> 什么是参数化的“生成分布”呢？这里生成网络的作用是将高斯分布的噪声转化为图像，也就是说生成的图像实际上来自于某个未知的分布，由于大多数的神经网络（除了特殊设计的Flow Model）是不可逆的，这个生成的分布无法计算概率密度函数，我们能得到的仅仅只有通过神经网络生成的“真实”图像样本。这里仅仅是把这个未知分布用数学符号$p_\theta(x)$表示。
+
+接下来我们以VAE（变分自编码器）为例，介绍如何推导出VAE的优化目标。首先我们从分布近似问题的定义出发：
+
+$$
+\min_\theta{\mathcal{F}(p_\theta, \tilde{\nu})},
+$$
+
+上式表达的意思是：优化一个神经网络，使得网络参数化的分布$p_\theta$接近目标分布$\tilde{\nu}$（真实图像），进而使生成的图像接近真实图像。具体来说，VAE使用的度量$\mathcal{F}$是$KL$散度：
+
+$$
+\begin{align*}
+&\min_\theta{KL(\tilde{\nu} \| p_\theta)}\\
+\Rightarrow & \min_\theta \int{\log{\frac{\tilde{\nu}}{p_\theta}}\mathrm{d}\tilde{\nu}} \\
+\Rightarrow & \max_\theta \int{\log{p_\theta}\mathrm{d}\tilde{\nu}} \\ 
+\Rightarrow & \max_\theta \mathbb{E}_{x \sim \tilde{\nu}}\left[\log{p_\theta(x)}\right], 
+\end{align*}
+$$
+
+上式就是VAE（也包括了早期的diffusion model）使用的“极大似然”损失函数（优化目标）。
+
+关于$\log{p_\theta(x)}$，进一步可得：
+
+$$
+\begin{align*}
+p_\theta(x) &= \int{p_\theta(x|z)p(z)\mathrm{d}z} \\
+&= \frac{p_\theta(x|z)p(z)}{p_\theta(z|x)}\\
+&= \frac{p_\theta(x|z)p(z)q_\phi(z|x)}{p_\theta(z|x)q_\phi(z|x)}
+\end{align*}
+$$
+
+> 这里的$q_\phi(z|x)$和$p_\theta(z|x)$的含义相似，可以看作是不同神经网络参数化的后验分布。熟悉VAE的读者应该可以看出$p_\theta(z|x)$是“未知的”编码器，$q_\phi(z|x)$是实际使用的近似编码器，$p_\theta(x|z)$是解码器。
+
+对等式两边求对数可得：
+
+$$
+\begin{align*}
+\log{p_\theta(x)} &= \log{\frac{p_\theta(x|z)p(z)q_\phi(z|x)}{p_\theta(z|x)q_\phi(z|x)}} \\
+&= \log{\frac{p_\theta(x|z)p(z)}{q_\phi(z|x)}} - \log{\frac{p_\theta(z|x)}{q_\phi(z|x)}}
+\end{align*}
+$$
+
+等式两边乘$q_\phi(z|x)$然后对$z$求积分可得：
+
+$$
+\begin{align*}
+\int{q_\phi(z|x)\log{p_\theta(x)}\mathrm{d}z} &=  \int{q_\phi(z|x)\log{\frac{p_\theta(x|z)p(z)}{q_\phi(z|x)}}\mathrm{d}z} - \int{q_\phi(z|x)\log{\frac{p_\theta(z|x)}{q_\phi(z|x)}}\mathrm{d}z}
+\end{align*}
+$$
+
+注意到$\log{p_\theta(x)}$与积分变量$z$无关，可得：
+
+$$
+\begin{align*}
+\log{p_\theta(x)} &=  \int{q_\phi(z|x)\log{\frac{p_\theta(x|z)p(z)}{q_\phi(z|x)}}\mathrm{d}z} - \int{q_\phi(z|x)\log{\frac{p_\theta(z|x)}{q_\phi(z|x)}}\mathrm{d}z}\\
+&= \underbrace{\mathbb{E}_{z\sim q_\phi(z|x)}\left[\log{\frac{p_\theta(x|z)p(z)}{q_\phi(z|x)}}\right]}_{ELBO} + KL\left(q_\phi(z|x) \| p_\theta(z|x)\right), 
+\end{align*}
+$$
+
+上述过程就是ELBO（Evidence Lower BOund）的数学推导，注意到KL散度的结果一定是非负的，因此有：
+
+$$
+\log{p_\theta(x)} \geq \mathbb{E}_{z\sim q_\phi(z|x)}\left[\log{p_\theta(x|z)p(z) - \log{q_\phi(z|x)}}\right]
+$$
+
+整理公式，可得如下的优化目标：
+
+$$
+\max_{\theta, \phi} \mathbb{E}_{x\sim \tilde{\nu}}\left[ \mathbb{E}_{z\sim q_\phi(z|x)}\left[\log{p_\theta(x|z)p(z) - \log{q_\phi(z|x)}}\right] \right]
+$$
+
+实际上，VAE和diffusion model的优化目标就是上式，VAE用神经网络建模编码器$q_\phi(z|x)$，用一个神经网络建模解码器$p_\theta(x|z)$，diffusion用随机过程建模编码器，并且将解码过程建模为多步神经网络的forward过程。
+
+> 那么生成对抗网络GAN也可以表达成类似的形式吗？
+
+在2014年发表的最初的GAN论文中可以找到作者对GAN优化目标的数学理解，实际上，GAN最小化参数分布$p_\theta$和目标分布$\tilde{\nu}$之间的$JS$散度（假设判别器以训练到最优）：
+
+$$
+\min_\theta KL\left(\tilde{\nu} \left\| \frac{\tilde{\nu} + p_\theta}{2} \right. \right) + KL\left(p_\theta \left\| \frac{\tilde{\nu} + p_\theta}{2} \right. \right).
+$$
+ 
+除了`Vanilla GAN`，还有`Wasserstein-GAN`，`MMD-GAN`，`Sinkhorn-GAN`等等，这些都可以用：
+
+$$
+\min_\mu{\mathcal{F}(\mu, \tilde{\nu})}
+$$
+
+表达，区别在于生成分布$\mu$的定义形式和使用的度量$\mathcal{F}$不同。
+
+> - Wasserstein GAN
+> - MMD GAN: Towards Deeper Understanding of Moment Matching Network
+> - Learning Generative Models with Sinkhorn Divergences
+
+最后，粒子变分推理法可以直接计算离散经验分布$\tilde{\mu}$，使其近似真实图像分布$\tilde{\nu}$。这个过程可以没有网络，ParVI可以直接计算出每个噪声平滑地变换为图像的过程，当然也可以用神经网络拟合这个过程，这也是2022年末很多diffusion模型的做法，这里我们不讨论详细的数学过程。
+
+> 代码可参考：https://github.com/lzj-isee/dpvi_discrete。
+
+<center><img src="problem/flow.png" width="90%" /></center>
+
+上图是ParVI方法在cifar10数据集上的一个简单实验结果。
