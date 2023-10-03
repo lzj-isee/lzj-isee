@@ -1,4 +1,5 @@
 title: 基于知识库的LLM问答系统参考资料
+date: 2023-07-1 22:13:00
 description: 基于知识库的LLM问答系统参考资料，一些开源的项目的链接。
 tags:
 - collections

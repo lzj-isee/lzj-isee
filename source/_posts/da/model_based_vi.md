@@ -1,5 +1,6 @@
 title: 采样与生成（2）：基于模型的变分推断
 description: 记录 Model-based Variational Inference 的一些公式推理过程。
+date: 2023-07-16 22:13:00
 tags:
 - 机器学习
 - 贝叶斯学习
