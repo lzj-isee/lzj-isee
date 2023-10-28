@@ -15,7 +15,7 @@ SVGD算法的全称是Stein Variational Gradient Descent（斯坦因变分梯度
 
 不过本人认为SVGD的价值在于开辟了新思路，从2017年的SVGD as gradient flow开始，经过2019年刘畅博士的几篇论文，SVGD逐渐发展为一类粒子变分（Particle-based Variational Inference, ParVI）方法的代表，这类方法从梯度流视角研究采样问题，甚至统一了动力学MCMC、ModVI和ParVI的基本原理，后逐步过渡到将采样问题与生成问题纳入到统一的求解框架。老实说我认为学习SVGD、MCMC、VI这些算法对于理解当今某些时髦的东西，比如扩散模型，是很有帮助的，从原理上来讲这些东西差距不大，都是一套变分推理的方法推导出来的。虽然已经这样说了SVGD算法的重要性，我还是需要提醒一下我并不认为SVGD有很高的、广泛的实用价值，尤其是现在的很多论文都是从优化领域拿了很多“现成的”组件，诸如降方差、受限域、非光滑、动量加速、黎曼流形等等，新瓶装旧酒重新刷一边。也不能说研究SVGD（或者说ParVI类算法）的改进是没有意义的，然而这些东西实在是太冷板凳了，而且从算法的“底色”来讲，我不觉得ParVI显著优于他的老前辈MCMC。
 
-对于机器学习领域的新手来说，理解SVGD算法充满了困难，这篇小短文希望能帮助更多的人学习SVGD。一般来说，初学者学习SVGD接触的论文应该是`Stein Variational Gradient Descent: A General Purpose Bayesian Inference Algorithm`，这篇论文第一次提出了SVGD算法，然而这篇论文讨论的东西，至少我是这么觉得的，实在是很令人费解。本人并不认为这篇小短文能完全讲清楚SVGD算法的细节，不过尝试给出SVGD的基本原理和思路，也是为了记录自己学习SVGD算法的结果。
+对于机器学习领域的新手来说，理解SVGD算法充满了困难，这篇小短文希望能帮助更多的人学习SVGD。一般来说，初学者学习SVGD接触的论文应该是`Stein Variational Gradient Descent: A General Purpose Bayesian Inference Algorithm`，这篇论文第一次提出了SVGD算法，然而这篇论文在写作流程方面，至少我是这么觉得的，实在是很令人费解。本人并不认为这篇小短文能完全讲清楚SVGD算法的细节，不过尝试给出SVGD的基本原理和思路，也是为了记录自己学习SVGD算法的结果。
 
 ## 问题设定
 SVGD一般被用来求解贝叶斯学习中的采样问题，这类问题讨论如何针对一个给定的复杂目标分布$p(\mathbf{x})$，高效地产生符合这个分布的样本点。目标分布$p(\mathbf{x})$通常有以下特点：
@@ -62,7 +62,77 @@ $$
 $$
 这里的$\mathcal{A}_{p}$叫做`Stein operator`（翻译成斯坦因算子？）。
 
-- 公式(3)的目的是求变换函数的方向，使得当步长$\epsilon$足够小的时候，变换后的分布$q_{[\mathbf{T}]}$尽可能接近目标分布$p$。
+- 公式(3)的目的是求变换函数的方向，在步长$\epsilon$足够小的条件下，变换后的分布$q_{[\mathbf{T}]}$尽可能接近目标分布$p$。如果要类比的话，相当于在求解“梯度下降”。
 - 公式(4)将公式(3)的优化目标进一步推导，使其关联上`Stein operator`，这是为了借用关于`Stein operator`的一些结论，相关部分可以参考论文`A Kernelized Stein Discrepancy for Goodness-of-fit Tests`，我们在下一节再讨论。
 
 接下来我们分析公式(4)的结论是怎么来的。
+
+### 证明 Theorem 3.1
+首先我们需要再次明确各个符号的含义：
+
+- $q$表示在当前迭代周期下，被优化，或者说被变换的分布。VI类方法的思路都是在一次次的迭代过程中不断将$q$变换为目标分布$p$。
+- $q_{[\mathbf{T}]}$表示在当前迭代周期下，$q$经过$\mathbf{T}$变换之后的分布。
+- 也就是说在下一次迭代中，$q_{[\mathbf{T}]}$就是新的$q$，只不过当前我们讨论范围仅局限于一次迭代中，因此没有加上迭代次数的标识。
+- 为了便于证明，我们记$p_{\left[\mathbf{T}^{-1}\right]}$为目标分布$p$被函数$\mathbf{T}$“反向变换”一次后的分布。
+- 也就是说如果从迭代的时间线上来看，理想情况下假设$q$最终会演化到目标分布$p$，则会有如下关系: 
+
+$$q \to q_{[\mathbf{T}]} \to ... \to p_{\left[\mathbf{T}^{-1}\right]} \to p$$
+
+然后我们需要了解两个关于矩阵行列式的引理，这里我直接给出公式，详情可查看参考链接：
+$$\text{det}(\mathbf{A}) = \frac{1}{\text{det}(\mathbf{A}^{-1})},$$
+其中$\mathbf{A}$表示一个矩阵，其逆存在且表示为$\mathbf{A}^{-1}$。
+
+> [参考链接](https://math.stackexchange.com/questions/1455761/how-is-the-determinant-related-to-the-inverse-of-matrix)
+
+$$\frac{\mathrm{d}}{\mathrm{d}t}\left[\text{det}\mathbf{A}(t)\right] = \text{det}\mathbf{A}(t) \cdot \text{trace}{\left[\mathbf{A}^{-1}(t)\cdot\frac{\mathrm{d}}{\mathrm{d}t}\mathbf{A}(t)\right]},$$
+其中$\mathbf{A}(t)$表示一个变量为$t$的矩阵，$\text{trace}$表示矩阵的迹。
+
+> [参考链接](https://mathoverflow.net/questions/214908/proof-for-the-derivative-of-the-determinant-of-a-matrix)
+
+关于分布$q$、$q_{[\mathbf{T}]}$、$p_{\left[\mathbf{T}^{-1}\right]}$、$p$，有如下关系：
+
+$$
+\begin{align*}{\tag{6}}
+q_{[\mathbf{T}]}(\mathbf{x}) &= q\left(\mathbf{T}^{-1}(\mathbf{x})\right)\left|\text{det}{\left(\nabla_{\mathbf{x}}\mathbf{T}^{-1}(\mathbf{x})\right)} \right| \\
+p(\mathbf{x}) &= p_{\left[\mathbf{T}^{-1}\right]}\left(\mathbf{T}^{-1}(\mathbf{x})\right)\left|\text{det}{\left(\nabla_{\mathbf{x}}\mathbf{T}^{-1}(\mathbf{x})\right)} \right|
+\end{align*}
+$$
+
+> 这里涉及到了概率分布的变量替换，相关技巧可以参考[此处](https://www.cs.ubc.ca/~murphyk/Teaching/Stat406-Spring08/homework/changeOfVariablesHandout.pdf)。
+
+基于公式(6)的分布变换关系，将两个式子的等号左边和右边分别相除，公式(4)的等号左边的原问题可以进一步写成：
+$$
+\nabla_{\epsilon}\left.\text{KL}(q_{[\mathbf{T}]} \| p)\right|_{\epsilon = 0} = \nabla_{\epsilon}\left.\text{KL}(q \| p_{\left[\mathbf{T}^{-1}\right]})\right|_{\epsilon = 0} = -\left. \mathbb{E}_{\mathbf{x}\sim q}\left[\nabla_{\epsilon}\log{p_{\left[\mathbf{T}^{-1}\right]}(\mathbf{x})}\right]\right|_{\epsilon = 0}. \tag{7}
+$$
+
+再次利用概率分布的变量替换技巧，对分布$p_{\left[\mathbf{T}^{-1}\right]}(\mathbf{x})$有如下结论：
+$$
+p_{\left[\mathbf{T}^{-1}\right]}(\mathbf{x}) = p(\mathbf{T}(\mathbf{x}))\left|\text{det}{\left(\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x})\right)} \right|. \tag{8}
+$$
+
+结合公式(8)，可对公式(7)中的项$\nabla_{\epsilon}\log{p_{\left[\mathbf{T}^{-1}\right]}(\mathbf{x})}$做如下推理：
+$$
+\begin{align*}{\tag{9}}
+\nabla_{\epsilon}\log{p_{\left[\mathbf{T}^{-1}\right]}(\mathbf{x})} &= \nabla_{\epsilon}\log{p(\mathbf{T}(\mathbf{x}))\left|\text{det}{\left(\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x})\right)} \right|} \\
+&= \nabla_{\epsilon} \left(\log{p(\mathbf{T}(\mathbf{x}))} + \log{\left|\text{det}{\left(\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x})\right)} \right|}\right) \\
+&= \nabla_{\mathbf{x}}\log{p(\mathbf{x})}^\top \cdot \nabla_{\epsilon}\mathbf{T}(\mathbf{x}) + \nabla_{\epsilon}\log{\left|\text{det}{\left(\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x})\right)}\right|} \\
+&= \nabla_{\mathbf{x}}\log{p(\mathbf{x})}^\top \cdot \nabla_{\epsilon}\mathbf{T}(\mathbf{x}) + \frac{\nabla_{\epsilon}\left|\text{det}{\left(\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x})\right)}\right|}{\left|\text{det}{\left(\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x})\right)}\right|} \\
+&= \nabla_{\mathbf{x}}\log{p(\mathbf{x})}^\top \cdot \nabla_{\epsilon}\mathbf{T}(\mathbf{x}) + \text{trace}\left( \left(\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x})\right)^{-1} \cdot \nabla_{\epsilon}\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x}) \right).
+\end{align*}
+$$
+
+这里最后一个等式的推理用到了矩阵行列式引理。另外结合公式(2)对变换函数$\mathbf{T}$的定义：
+$$\mathbf{T}(\mathbf{x}) = \mathbf{x} + \epsilon \boldsymbol{\phi(\mathbf{x})}.$$
+
+可以推理得出结论：
+$$
+\begin{align*}\tag{10}
+& \nabla_{\epsilon}\left.\text{KL}(q_{[\mathbf{T}]} \| p)\right|_{\epsilon = 0}\\
+=& -\left. \mathbb{E}_{\mathbf{x}\sim q}\left[\nabla_{\epsilon}\log{p_{\left[\mathbf{T}^{-1}\right]}(\mathbf{x})}\right]\right|_{\epsilon = 0} \\
+=& -\left. \mathbb{E}_{\mathbf{x}\sim q}\left[ \nabla_{\mathbf{x}}\log{p(\mathbf{x})}^\top \cdot \nabla_{\epsilon}\mathbf{T}(\mathbf{x}) + \text{trace}\left( \left(\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x})\right)^{-1} \cdot \nabla_{\epsilon}\nabla_{\mathbf{x}}\mathbf{T}(\mathbf{x}) \right) \right]\right|_{\epsilon = 0} \\
+=& - \mathbb{E}_{\mathbf{x}\sim q}\left[ \nabla_{\mathbf{x}}\log{p(\mathbf{x})}^\top \cdot \boldsymbol{\phi(\mathbf{x})}  + \text{trace}\left( \nabla_{\mathbf{x}}\boldsymbol{\phi(\mathbf{x})} \right) \right] \\
+=& - \mathbb{E}_{\mathbf{x}\sim q}\left[ \text{trace}\left( \nabla_{\mathbf{x}}\log{p(\mathbf{x})}\boldsymbol{\phi(\mathbf{x})}^\top + \nabla_{\mathbf{x}}\boldsymbol{\phi(\mathbf{x})} \right)\right].
+\end{align*}
+$$
+公式(4)证明完毕。
+
