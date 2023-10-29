@@ -136,3 +136,103 @@ $$
 $$
 公式(4)证明完毕。
 
+### Theorem 3.1的意义
+
+1. SVGD方法假设存在一个变换函数$\mathbf{T}$（或表达为$\mathbf{T}_{q,p}$），该函数被迭代地作用于一个演化分布 $q$，使得每一次经过变换后的分布$q_{[\mathbf{T}]}$能够更接近目标分布$p$。
+2. 该变换函数$\mathbf{T}$的具体形式被定义为：$\mathbf{T}(\mathbf{x}) = \mathbf{x} + \epsilon \boldsymbol{\phi(\mathbf{x})}$，其中$\boldsymbol{\phi(\mathbf{x})}$代表了变换的方向函数。
+3. 在上述假设下，最优$\boldsymbol{\phi(\mathbf{x})}$是使得$q_{[\mathbf{T}]}$与$p$之间的KL散度下降最快：$\arg\min_{\boldsymbol{\phi}}{\nabla_{\epsilon}\left.\text{KL}(q_{[\mathbf{T}]} \| p)\right|_{\epsilon = 0}}.$
+4. 经过数学推导，原问题可进一步表达为：
+$$
+\nabla_{\epsilon}\left.\text{KL}(q_{[\mathbf{T}]} \| p)\right|_{\epsilon = 0} = - \mathbb{E}_{\mathbf{x}\sim q}\left[ \text{trace}\left( \nabla_{\mathbf{x}}\log{p(\mathbf{x})}\boldsymbol{\phi(\mathbf{x})}^\top + \nabla_{\mathbf{x}}\boldsymbol{\phi(\mathbf{x})} \right)\right].
+$$
+5. 也就是说，现在需要求解:
+$$
+\arg\max_{\boldsymbol{\phi}} \mathbb{E}_{\mathbf{x}\sim q}\left[ \text{trace}\left( \nabla_{\mathbf{x}}\log{p(\mathbf{x})}\boldsymbol{\phi(\mathbf{x})}^\top + \nabla_{\mathbf{x}}\boldsymbol{\phi(\mathbf{x})} \right)\right].\tag{11}
+$$
+
+### Lemma 3.2
+在SVGD论文中，引理3.2的含义是：如果$\boldsymbol{\phi}$限定为再生核希尔伯特空间（RKHS）的单位球内，那么问题(11)的解为：
+$$
+\boldsymbol{\phi}^*_{q,p}(\mathbf{x}) = \mathbb{E}_{\mathbf{y}\sim q}\left[ k(\mathbf{y}, \mathbf{x})\nabla_{\mathbf{y}}\log{p(\mathbf{y})} + \nabla_{\mathbf{y}}k(\mathbf{y}, \mathbf{x}) \right], \tag{12}
+$$
+其中$k$为RKHS的再生核函数，经常使用的是高斯核函数。
+
+### 如何理解Lemma 3.2
+
+> 该部分内容需要了解论文：A Kernelized Stein Discrepancy for Goodness-of-fit Tests
+
+##### Stein class and Stein's operator
+概率分布$p$关于函数$f:\mathbb{R}\to\mathbb{R}$的Stein's operator被定义为：
+$$\mathcal{A}_{p}f(x) = \nabla_x \log{p(x)}f(x) + \nabla_x f(x), \tag{13}$$
+
+对于向量函数$\boldsymbol{f}:\mathbb{R}^d\to\mathbb{R}^d$，其计算结果为一个矩阵：
+$$\mathcal{A}_{p}\boldsymbol{f}(\mathbf{x}) = \nabla_{\mathbf{x}} \log{p(\mathbf{x})}\boldsymbol{f}(\mathbf{x})^\top + \nabla_{\mathbf{x}} \boldsymbol{f}(\mathbf{x}). \tag{14}$$
+
+如果函数$f$是光滑的且与概率分布$p$满足：
+$$\int{\nabla_x \left( f(x)p(x) \right)\mathrm{d}x} = 0, \tag{15} $$
+则称$f$属于概率分布$p$的Stein class（对于向量函数$\boldsymbol{f}:\mathbb{R}^d\to\mathbb{R}^d$有类似结论，等式右边就是一个全零矩阵，如果变量是向量$\mathbf{x}$，那么等式右边就是一个全零向量）。
+
+公式(15)的描述的条件是比较好满足的，if function $f$ is smooth with proper zero-boundary:
+$$
+\nabla_x C = \nabla_x \int{f(x)p(x)\mathrm{d}x} = \int{\nabla_x \left( f(x)p(x) \right)\mathrm{d}x} = 0,
+$$
+其中$C$表示一个常数。
+
+##### 方向函数的范数
+不严谨地说，公式(11)描述的问题其实是某种范数，接下来我们将通过推导展现这一点。
+
+假设方向函数$\boldsymbol{\phi}$ is smooth with proper zero-boundary，那么基于前面关于 stein class 的讨论，可以得到：
+$$
+\begin{align*}{\tag{16}}
+& \int{\nabla_{\mathbf{x}}\left( \boldsymbol{\phi}(\mathbf{x}) q(\mathbf{x}) \right) \mathrm{d}\mathbf{x}}\\
+=& \int{ \left(\nabla_{\mathbf{x}}\boldsymbol{\phi}(\mathbf{x})q(\mathbf{x}) + \boldsymbol{\phi}(\mathbf{x})\nabla_{\mathbf{x}}q(\mathbf{x})\right) \mathrm{d}\mathbf{x}} \\
+=& \int{ \left( \nabla_{\mathbf{x}}\log{q(\mathbf{x})}^\top\boldsymbol{\phi}(\mathbf{x}) + \nabla_{\mathbf{x}}\boldsymbol{\phi}(\mathbf{x})  \right)\mathrm{d}q(\mathbf{x}) }\\
+=& \mathbb{E}_{\mathbf{x} \sim q}\left[ \nabla_{\mathbf{x}}\log{q(\mathbf{x})}^\top\boldsymbol{\phi}(\mathbf{x}) + \nabla_{\mathbf{x}}\boldsymbol{\phi}(\mathbf{x}) \right]\\
+=& \mathbf{O},
+\end{align*}
+$$
+这里用$\mathbf{O}$表示全零矩阵。
+
+再次回顾公式(11)定义的问题，可以经过推理得到：
+$$
+\begin{align*}{\tag{17}}
+& \arg\max_{\boldsymbol{\phi}} \mathbb{E}_{\mathbf{x}\sim q}\left[ \text{trace}\left( \nabla_{\mathbf{x}}\log{p(\mathbf{x})}\boldsymbol{\phi(\mathbf{x})}^\top + \nabla_{\mathbf{x}}\boldsymbol{\phi(\mathbf{x})} \right)\right] \\
+=& \arg\max_{\boldsymbol{\phi}} \mathbb{E}_{\mathbf{x}\sim q}\left[ \text{trace}\left( \nabla_{\mathbf{x}}\log{p(\mathbf{x})}\boldsymbol{\phi(\mathbf{x})}^\top + \nabla_{\mathbf{x}}\boldsymbol{\phi(\mathbf{x})} \right)\right] - \\ 
+& \mathbb{E}_{\mathbf{x}\sim q}\left[ \text{trace}\left( \nabla_{\mathbf{x}}\log{q(\mathbf{x})}\boldsymbol{\phi(\mathbf{x})}^\top + \nabla_{\mathbf{x}}\boldsymbol{\phi(\mathbf{x})} \right)\right] \\
+=& \arg\max_{\boldsymbol{\phi}} \mathbb{E}_{\mathbf{x}\sim q}\left[ \text{trace}\left( \nabla_{\mathbf{x}}\log{p(\mathbf{x})}\boldsymbol{\phi(\mathbf{x})}^\top - \nabla_{\mathbf{x}}\log{q(\mathbf{x})}\boldsymbol{\phi(\mathbf{x})}^\top \right)\right] \\
+=& \arg\max_{\boldsymbol{\phi}} \mathbb{E}_{\mathbf{x}\sim q}\left[ \text{trace}\left( \left(\nabla_{\mathbf{x}}\log{p(\mathbf{x})} - \nabla_{\mathbf{x}}\log{q(\mathbf{x})}\right)\boldsymbol{\phi(\mathbf{x})}^\top \right)\right],
+\end{align*}
+$$
+推导到这里其实已经很明显了，这就是两个函数关于分布$q$的内积，如果先不考虑RKHS，此时公式(11)定义的问题的解为：
+$$ \boldsymbol{\phi}^*_{q,p}(\mathbf{x}) = \nabla_{\mathbf{x}}\log{p(\mathbf{x})} - \nabla_{\mathbf{x}}\log{q(\mathbf{x})}. \tag{18} $$
+
+> Q: 既然已经得到了方向函数的解，那为什么还要有RKHS限制?
+> A: 这是因为公式(18)的解涉及到了对演化分布的概率密度函数求梯度，而SVGD方法使用粒子群模拟分布$q$，因此没法求梯度。
+
+> Q: 如果不使用粒子群，而是直接参数化分布$q$会怎样？
+> A: 那么公式(17)的结论就是ELBO，SVGD方法坍缩为基于模型的VI方法。
+
+需要注意到，SVGD方法得到的方向函数，即公式(12)，是不用计算$q$的梯度的，相反计算的是核函数$k$的梯度。
+
+接下来我们再看SVGD方法求解的方向函数，即公式(12)的含义是什么（为了省点事我去掉了下标和上标）。我们还是利用 stein class 的性质，可以得到如下结论：
+$$
+\begin{align*}{\tag{19}}
+\boldsymbol{\phi}(\mathbf{x}) =& \mathbb{E}_{\mathbf{y}\sim q}\left[ k(\mathbf{y}, \mathbf{x})\nabla_{\mathbf{y}}\log{p(\mathbf{y})} + \nabla_{\mathbf{y}}k(\mathbf{y}, \mathbf{x}) \right] \\
+=& \mathbb{E}_{\mathbf{y}\sim q}\left[ k(\mathbf{y}, \mathbf{x}) \left(\nabla_{\mathbf{y}}\log{p(\mathbf{y})} - \nabla_{\mathbf{y}}\log{q(\mathbf{y})} \right)\right].
+\end{align*}
+$$
+
+将公式(19)带入公式(17)的结论，可以得到：
+$$
+\begin{align*}{\tag{20}}
+\mathbb{E}_{\mathbf{x}\sim q, \mathbf{y}\sim q}\left[ \left(\nabla_{\mathbf{x}}\log{p(\mathbf{x})} - \nabla_{\mathbf{x}}\log{q(\mathbf{x})}\right)^\top k(\mathbf{y}, \mathbf{x})\left(\nabla_{\mathbf{x}}\log{p(\mathbf{x})} - \nabla_{\mathbf{x}}\log{q(\mathbf{x})}\right) \right].
+\end{align*}
+$$
+
+公式(20)是RKHS空间中一个函数的 norm，这个函数的形式是：
+$$f(\cdot) = \int{\left(\nabla_{\mathbf{z}}\log{p(\mathbf{z})} - \nabla_{\mathbf{z}}\log{q(\mathbf{z})}\right)k(\mathbf{z}, \cdot)\mathrm{d}\mathbf{z}}, \tag{21}$$
+这里我用了$\mathbf{z}$符号，只是为了区分$\mathbf{x}$和$\mathbf{y}$，避免误解。公式(21)表达了用核函数$k$将方向函数(18)映射到RKHS空间的过程，或者说，公式(21)是公式(18)的smooth版本，使用分部积分法，可以从公式(21)推导出SVGD的解，即公式(12)。
+
+完毕。
+
+> 上面的这些推理我没能在硕士期间完全搞明白，相反我通常是从梯度流角度来解释SVGD的，不过现在毕业了，我仅仅花了半个晚上的时间就正面理解了SVGD，真是神奇:)
