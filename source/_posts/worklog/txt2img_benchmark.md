@@ -70,9 +70,16 @@ tags:
 
 但是，构建这个一个值得信赖的标签系统是很困难的，因此我在第一次构建评测数据集时放弃了测试Precision指标。
 我的思路回到了开源benchmark的做法，即为图文构建一对一的绑定关系，先搞定测试Recall指标。
-然而正如上述提到的前提，我只有图片数据，因此一个自然的想法是，**能不能借助LLM的力量为图片批量生成较高质量的caption？**
+然而正如上述提到的前提，我只有图片数据，因此一个自然的想法是，**能不能借助LLM的力量为图片批量生成较高质量的caption？**以LLM生成的caption作为问询Query，测试文搜图系统在特定domain的Recall性能。
 
 ## 模型选择
+在当前时间节点（23年9月），我主要考虑了以下几个可用于图像描述的多模态模型：
+
+* [`Salesforce的Blip2系列`](https://huggingface.co/Salesforce/blip2-opt-2.7b): blip系列是现在这段时间内很有代表性的多模态模型架构了，很多多模态图文大模型都是基于blip的结构。但是这个huggingface上的官方blip仓库只提供了图片英文caption功能，不适用于我当前的中文文搜图场景。
+* [`Ziya-BLIP2-14B-Visual-v1`](https://huggingface.co/IDEA-CCNL/Ziya-BLIP2-14B-Visual-v1): 也是基于blip2结构的图文多模态大模型，支持中文，不过我最后没有选择该模型，原因是需要申请LLama的权重，在此期间我尝试了其他模型，效果基本符合要求，因此没有采用`Ziya`。
+* [`VisualGLM-6B`](https://github.com/THUDM/VisualGLM-6B): 和知名的`ChatGLM`同源，试用后发现问答和详细图片内容描述还是很不错的。但是我的场景需要大约40字描述图片的主要内容，语言风格尽量朴实，类似`COCO-CN`数据集的caption风格。但是`VisualGLM-6B`的图片描述类似写作文，加入了很多不必要的细节描述以及个人化猜测，而且这些行为很难通过修改prompt避免（至少我自己尝试了不同prompt后发现差别不大），因此放弃使用该模型。
+* [`Qwen-VL`](https://github.com/QwenLM/Qwen-VL): 这个注意要使用23年9月25日以后的版本，和第一版差别比较大。该版本和`VisualGLM-6B`相比，在我这个场景下的差异主要是`Qwen-VL`更能遵循指令要求，比较容易控制生成的图片caption的风格和详略程度，因此最后选择了该模型。
+
 
 ## 图片数据清洗
 
