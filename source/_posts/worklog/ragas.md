@@ -144,6 +144,89 @@ Rouge-L-F1是二者的几何平均数。
 第一个步骤的Prompt是few-show写法，其中的system与一轮对话示例分别是（更多示例可参考WikiChat论文）：
 
 ```python
+SYSTEM = {
+    "role": "system", 
+    "content": f"以下是 User 与名为 Seb 的问答机器人之间的对话，请将 Seb 回答中提到的事实总结拆分为多个独立的、完整的、自包含的陈述句，排除你自己的观点和陈述。\n现在的时间是: {time.strftime('%Y-%m-%d', time.localtime())}"
+}
 
+ONE_CASE = [
+    {
+        "role": "user", 
+        "content": "\n".join([
+            "User: 你知道伊丽莎白女王二世吗？我刚在读关于她的书", 
+            "Seb: 伊丽莎白二世女王是英国和英联邦国家的现任君主。她出生于 1926 年，1952 年成为女王。", 
+            "将 Seb 回答中提到的事实总结拆分为多个独立的、完整的、自包含的陈述句，排除你自己的观点："
+        ])
+    }, {
+        "role": "assistant", 
+        "content": "\n".join([
+            "* 女王伊丽莎白二世出生于 1926 年。", 
+            "* 伊丽莎白二世于 1952 年成为女王。"
+        ])
+    }
+]
+```
+在解析LLM的response时，首先按照换行符拆分为多个句子，然后检查每个句子是否是以示例的"*"为起始字符，将response解析为多个claim。
+另外需要注意的是，WikiChat中给了一些范例的assistant content是“Nothing”，比如User提问是向LLM打招呼，而非提问类型。
+
+> WikiChat中一个有新意的做法是将当前的时间或日期信息写在system或者user中，有助于提升一些与当前时间相关的回答质量。
+
+第二个步骤的Prompt的system与一轮对话示例分别是（更多示例可参考WikiChat论文）：
+
+```python
+SYSTEM = {
+    "role": "system", 
+    "content": f"对每个 claim，你需要在互联网上搜索可以支持或反驳该声明的 articles，并输出'SUPPORTS'、'REFUTES'或者'NOT ENOUGH INFO'中的一个。\n仅当检索到的 articles 完全支持该声明时，才输出'SUPPORTS'。\n现在的时间是: {time.strftime('%Y-%m-%d', time.localtime())}"
+}
+
+ONE_CASE = [
+    {
+        "role": "user", 
+        "content": "\n".join([
+            "你在互联网上搜索：埃菲尔铁塔是铁做的", 
+            "[你得到了这些 article：", 
+            "\tTitle: ", 
+            "\tArticle: ...", 
+            "\tTitle: 埃菲尔铁塔 埃菲尔铁塔", 
+            "\tArticle: 法国巴黎火星香榭丽舍大街上的埃菲尔铁塔...", 
+            "]", 
+            "根据 article 核查声明：埃菲尔铁塔是铁做的", 
+            "You think step by step"
+        ])
+    }, {
+        "role": "assistant", 
+        "content": "埃菲尔铁塔是一座锻铁格子塔，因此它是由铁制成的。因此，事实核查的结果是 'SUPPORTS'。"
+    }
+]
+```
+在解析LLM的输出时，直接按照字符串匹配判断当前事实是否是support即可。由于我使用的LLM性能较弱，因此我实际使用的规则会更复杂一些：
+
+```python
+if "REFUTES" in lines.upper():
+    return "neg"
+elif "NOT ENOUGH INFO" in lines.upper():
+    return "imp"
+elif "SUPPORTS" in lines.upper() or "SUPPORTED" in lines.upper() or "是正确的" in lines or "支持了该声明" in lines or "支持声明" in lines:
+    return "pos"
+else:
+    return "neg"
 ```
 
+最后统计所有被判定support的claim占总claim数量的比例作为faithfulness得分。
+
+# 测试CASE
+判定Faithfulness归根结底是使用LLM做逻辑推断，因此难免因LLM自身的性能问题导致判断错误，在我实际使用QwenMax作为claim提取，QwenPlus作为claim判断的实现结果中，37个被判定为REFUTES的case，发现有5个是被误判的，即本应是SUPPORT或NOT ENOUGH INFO被LLM判定成了REFUTES（需要注意的是，不同人对于同一个case的判定结果不尽相同，这里是我自己的判断结果）。
+就我自己的感受而言，使用LLM判定RAG的Faithfulness大体上是靠谱的，我在实际测试中更关注被判定为REFUTES的样本，这些样本相当于当前RAG系统的corner case。
+显然，当RAGAS这套评测流程配合自动化的测试数据集构建方案（WikiChat这篇论文也讨论了如何使用LLM模拟用户对话RAG系统），可以长时间大规模自动化地在准备好的文档语料中找到当前RAG系统的corner case，这其实比测试系统得出的一个打分更有助于迭代升级。
+
+# 结论
+本文简述了RAG系统的评测方案RAGAS以及本人在实际实现中的一点心得体会。
+RAGAS配合自动化测试数据集生成可批量测试RAG系统的corner case，有助于迭代升级；实际实现中也确定使用LLM判断RAG系统的回答Faithfulness是比较靠谱的事情。
+但是，当前的测试方案至少还有如下待改进点：
+
+1. 速度慢，诊断一条case大约需要20s
+2. 耗费token数量多，价格贵
+3. 比较考验LLM的性能问题，性能差的LLM判定Faithfulness可能失误率比较高
+4. 可能需要对某些特殊场景（如代码生成）做特殊调整
+
+在当前时间节点，RAGAS已经是测试RAG系统比较完善的一个方案了，其他讨论RAG benchmark的论文大体上也与RAGAS的思路类似，在实现中，也需要结合当前实际场景做针对性的调整。
